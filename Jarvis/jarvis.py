@@ -1,7 +1,6 @@
 import sounddevice as sd
 import numpy as np
 import speech_recognition as sr
-import webbrowser
 import wave
 import io
 import os
@@ -12,14 +11,49 @@ import win32con
 import win32process
 import time
 
-# Настройки записи
-SAMPLE_RATE = 16000
-DURATION = 5  # секунд
 
+# ==================== НАСТРОЙКИ ====================
+SAMPLE_RATE = 16000
+DURATION = 5  # секунд записи команды
+
+# Путь к браузеру (для открытия сайтов). Сейчас — Edge.
+BROWSER_PATH = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+
+
+# ==================== СЛОВАРЬ ПРИЛОЖЕНИЙ ====================
+apps = {
+    # Браузер (открытие сайтов идёт через BROWSER_PATH)
+    "яндекс": BROWSER_PATH,
+    "edge":   BROWSER_PATH,
+
+    # Приложения
+    "steam":     "C:/Program Files (x86)/Steam/Steam.exe",
+    "kimi":      "C:/Users/ADMIN F/AppData/Local/Programs/Kimi/Kimi.exe",
+    "hub":       "C:/Program Files/FlyFrogLLC/Happ/Happ.exe",
+    "хаб":       "C:/Program Files/FlyFrogLLC/Happ/Happ.exe",
+    "teamspeak": "C:/Users/ADMIN F/AppData/Local/Programs/TeamSpeak/TeamSpeak.exe",
+    "калькулятор": "calc.exe",
+
+    # Сайты
+    "ютуб":      "https://www.youtube.com",
+    "github":    "https://github.com/Ulibca",
+    "музыка":    "https://music.yandex.ru",
+    "ivi":       "https://www.ivi.ru/programs",
+    "telegram":  "https://web.telegram.org/k/#@Koteikin69",
+}
+
+
+# ==================== ЗАПИСЬ АУДИО ====================
 def record_audio():
     print("Слушаю...")
-    audio_data = sd.rec(int(DURATION * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype='int16')
+    audio_data = sd.rec(
+        int(DURATION * SAMPLE_RATE),
+        samplerate=SAMPLE_RATE,
+        channels=1,
+        dtype='int16'
+    )
     sd.wait()
+
     with io.BytesIO() as wav_io:
         with wave.open(wav_io, 'wb') as wf:
             wf.setnchannels(1)
@@ -29,63 +63,48 @@ def record_audio():
         wav_io.seek(0)
         return sr.AudioData(wav_io.read(), SAMPLE_RATE, 2)
 
-# Словарь приложений и сайтов
-apps = {
-    "яндекс": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-    "steam": "C:/Program Files (x86)/Steam/Steam.exe",  # сырая строка
-    "ютуб": "https://www.youtube.com",
-    "github": "https://github.com/Ulibca",
-    "музыка": "https://music.yandex.ru",
-    "калькулятор": "calc.exe",  # можно и системные команды
-    "дипсик": "",
-    "kimi": "C:/Users/ADMIN F/AppData/Local/Programs/Kimi/Kimi.exe",
-    "юнити": "",
-    "грок": "",
-    "ivi": "https://www.ivi.ru/programs",
-    "telergrem": "https://web.telegram.org/k/#@Koteikin69",
-    "hub": "C:/Program Files/FlyFrogLLC/Happ/Happ.exe",
-    "хаб": "C:/Program Files/FlyFrogLLC/Happ/Happ.exe",
-    "teamspeak": "C:/Users/ADMIN F/AppData/Local/Programs/TeamSpeak/TeamSpeak.exe",
-    "": "",
-    "": "",
-    "": "",
-    "": "",
-    "": "",
-}
-running_processes ={}
-#НАПИСАТЬ СЛОВАРЬ СИНОНИМОВ
-YANDEX_BROWSER = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+
+# ==================== ОТКРЫТИЕ ====================
 def open_app(name):
-    """Открывает приложение или сайт по его имени"""
+    """Открывает приложение или сайт по его имени."""
     path = apps.get(name.lower())
     if not path:
         print(f"Приложение '{name}' не найдено в списке.")
         return
 
     if path.startswith("http"):
-        subprocess.Popen([YANDEX_BROWSER, path])
-        print(f"Открываю сайт {name}")
-    else:
+        # Сайт — открываем в указанном браузере
         try:
-            proc = subprocess.Popen([path])
-            running_processes[name] = proc
+            subprocess.Popen([BROWSER_PATH, path])
+            print(f"Открываю сайт {name}")
+        except Exception as e:
+            print(f"Не удалось открыть сайт: {e}")
+    else:
+        # Приложение — запускаем .exe
+        try:
+            subprocess.Popen([path])
             print(f"Открываю приложение {name}")
         except Exception as e:
             print(f"Не удалось запустить: {e}")
 
+
+# ==================== ЗАКРЫТИЕ (МЯГКОЕ) ====================
 def _graceful_close(process_name, app_path):
     """
     Пытается закрыть приложение мягко.
-    Для Steam использует специальную команду -shutdown.
-    Для остальных — посылает WM_CLOSE в окно (как крестик).
+    Для Steam использует команду -shutdown.
+    Для остальных — посылает WM_CLOSE в окна (как крестик).
+    Возвращает True, если удалось отправить сигнал закрытия.
     """
-    # --- Особый случай для Steam ---
-    if process_name.lower() == "steam.exe":
+    process_name = process_name.lower()
+
+    # --- Особый случай: Steam ---
+    if process_name == "steam.exe":
         print("Обнаружен Steam. Отправляю команду -shutdown...")
         try:
             subprocess.run([app_path, "-shutdown"], timeout=10)
             # Ждём, пока процесс завершится
-            for _ in range(20):
+            for _ in range(20):  # 10 секунд
                 time.sleep(0.5)
                 if not any(
                     p.info.get('name', '').lower() == process_name
@@ -117,25 +136,29 @@ def _graceful_close(process_name, app_path):
     return closed
 
 
-# def _force_close(process_name):
-#     """Жёстко убивает все процессы с указанным именем."""
-#     killed = False
-#     for proc in psutil.process_iter(['pid', 'name']):
-#         try:
-#             if proc.info['name'].lower() == process_name:
-#                 proc.terminate()
-#                 try:
-#                     proc.wait(timeout=3)
-#                 except psutil.TimeoutExpired:
-#                     proc.kill()
-#                 killed = True
-#         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-#             pass
-#     return killed
+def _has_visible_windows(process_name):
+    """Проверяет, есть ли у процесса хоть одно видимое окно."""
+    process_name = process_name.lower()
+    found = False
+
+    def enum_handler(hwnd, _):
+        nonlocal found
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        try:
+            proc = psutil.Process(pid)
+            if proc.name().lower() == process_name:
+                found = True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    win32gui.EnumWindows(enum_handler, None)
+    return found
 
 
 def close_app(name):
-    """Закрывает приложение мягко, если не вышло — жёстко."""
+    """Закрывает приложение мягко, как крестик. Без жёсткого kill()."""
     path = apps.get(name.lower())
     if not path:
         print(f"Приложение '{name}' не найдено.")
@@ -147,26 +170,24 @@ def close_app(name):
 
     process_name = os.path.basename(path).lower()
 
-    # 1. Пробуем мягко
-    print(f"Пробую закрыть {name} мягко...")
-    if _graceful_close(process_name, path):
-        # Даём приложению время на корректное завершение
-        for _ in range(10):
-            time.sleep(0.5)
-            if not any(
-                p.info.get('name', '').lower() == process_name
-                for p in psutil.process_iter(['name'])
-            ):
-                print(f"Закрыл {name} корректно ✅")
-                return
-        print(f"{name} не закрылся мягко, пробую жёстко...")
+    # 1. Пробуем мягко закрыть (Steam обрабатывается внутри _graceful_close)
+    if not _graceful_close(process_name, path):
+        print(f"У {name} нет видимых окон — возможно, не запущен.")
+        return
 
-    # # 2. Жёстко
-    # if _force_close(process_name):
-    #     print(f"Закрыл {name} принудительно ⚠️")
-    # else:
-    #     print(f"{name} не найден (возможно, не запущен).")
-# Основной цикл
+    print(f"Попросил {name} закрыться...")
+
+    # 2. Ждём, пока пропадут ВИДИМЫЕ ОКНА (а не процесс целиком)
+    for _ in range(20):  # 10 секунд
+        time.sleep(0.5)
+        if not _has_visible_windows(process_name):
+            print(f"{name} закрылся ✅")
+            return
+
+    print(f"{name} не закрылся (окна всё ещё видны).")
+
+
+# ==================== ОСНОВНОЙ ЦИКЛ ====================
 r = sr.Recognizer()
 print("Привет, я Джарвис. Чем могу помочь?")
 
@@ -175,29 +196,25 @@ while True:
     try:
         text = r.recognize_google(audio, language="ru_RU").lower()
         print(f"Вы сказали: {text}")
-        
-        # Проверка на выход
-        if text in ("стоп", "выход", "пока", "заверши", 'закончи', 'закончим'):
+
+        # Выход
+        if text in ("стоп", "выход", "пока", "заверши", "закончи", "закончим"):
             print("До свидания!")
             break
 
-        # Извлекаем имя приложения из команды "открой ..."
         # Открытие
         if text.startswith("джарвис открой "):
             name = text.replace("джарвис открой ", "").strip()
             open_app(name)
-        
+
         # Закрытие
         elif text.startswith("джарвис закрой "):
             name = text.replace("джарвис закрой ", "").strip()
-            # Позже закрываем
-            # proc.terminate()
-            # proc.wait()
-            close_app(name)                 # ✅ правильное имя функции
-        else:
-            name = text  # если сказано просто "яндекс"
+            close_app(name)
 
-        # Открываем
+        # Если сказано что-то другое — ничего не делаем
+        else:
+            print("Команда не распознана.")
 
     except sr.UnknownValueError:
         print("Извините, я не расслышал.")
