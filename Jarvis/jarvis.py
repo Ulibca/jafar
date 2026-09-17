@@ -10,7 +10,13 @@ import win32gui
 import win32con
 import win32process
 import time
-
+# python -m pip install sounddevice
+# python -m pip install numpy
+# python -m pip install SpeechRecognition
+# python -m pip install pyaudio
+# python -m pip install psutil
+# python -m pip install pywin32
+# python -m pip install sounddevice numpy SpeechRecognition pyaudio psutil pywin32
 
 # ==================== НАСТРОЙКИ ====================
 SAMPLE_RATE = 16000
@@ -18,13 +24,13 @@ DURATION = 5  # секунд записи команды
 
 # Путь к браузеру (для открытия сайтов). Сейчас — Edge.
 BROWSER_PATH = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-
+BROWSER_PATH_2 = "C:/Program Files (x86)/Yandex/YandexBrowser/Application/browser.exe"
 
 # ==================== СЛОВАРЬ ПРИЛОЖЕНИЙ ====================
 apps = {
     # Браузер (открытие сайтов идёт через BROWSER_PATH)
-    "яндекс": BROWSER_PATH,
     "edge":   BROWSER_PATH,
+    "яндекс": BROWSER_PATH_2,
 
     # Приложения
     "steam":     "C:/Program Files (x86)/Steam/Steam.exe",
