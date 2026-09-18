@@ -38,6 +38,11 @@ apps = {
     "hub":       "C:/Program Files/FlyFrogLLC/Happ/Happ.exe",
     "хаб":       "C:/Program Files/FlyFrogLLC/Happ/Happ.exe",
     "teamspeak": "C:/Users/ADMIN F/AppData/Local/Programs/TeamSpeak/TeamSpeak.exe",
+    "мизери": 'steam://rungameid/2119830',
+    "мызери": 'steam://rungameid/2119830',
+    "калькулятор": "calc.exe",
+    "калькулятор": "calc.exe",
+    "калькулятор": "calc.exe",
     "калькулятор": "calc.exe",
 
     # Сайты
@@ -77,7 +82,10 @@ def open_app(name):
     if not path:
         print(f"Приложение '{name}' не найдено в списке.")
         return
-
+    if path.startswith('steam://'):
+        os.startfile(path)
+        print(f'Запускаю {name} через Steam')
+        return
     if path.startswith("http"):
         # Сайт — открываем в указанном браузере
         try:
